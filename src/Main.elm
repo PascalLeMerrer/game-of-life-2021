@@ -8,6 +8,8 @@ import Html.Styled.Attributes exposing (class)
 import Html.Styled.Events exposing (onClick)
 import List.Extra as List
 import Pattern exposing (Cell, Pattern)
+import Random
+import Random.List
 import StyleSheet exposing (classes)
 import Svg.Styled exposing (fromUnstyled)
 import Time exposing (Posix)
@@ -19,13 +21,15 @@ import TypedSvg.Types exposing (Paint(..))
 
 type alias Model =
     { cells : List Cell
-    , pattern : Pattern
+    , selectedPattern : Maybe Pattern
     }
 
 
 type Msg
     = Tick Posix
-    | Select Pattern
+    | UserSelected Pattern
+    | UserClickedGenerateRandomPattern
+    | RuntimeSelectedRandomNumbers ( List Int, List Int )
 
 
 main : Program () Model Msg
@@ -41,7 +45,7 @@ main =
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( { cells = Pattern.blinker.cells
-      , pattern = Pattern.blinker
+      , selectedPattern = Just Pattern.blinker
       }
     , Cmd.none
     )
@@ -55,12 +59,31 @@ update msg model =
             , Cmd.none
             )
 
-        Select pattern ->
+        UserSelected pattern ->
             ( { cells = pattern.cells
-              , pattern = pattern
+              , selectedPattern = Just pattern
               }
             , Cmd.none
             )
+
+        UserClickedGenerateRandomPattern ->
+            let
+                generator =
+                    List.range 1 20
+                        |> Random.List.choices 10
+            in
+            ( { model | selectedPattern = Nothing }
+            , Random.generate RuntimeSelectedRandomNumbers generator
+            )
+
+        RuntimeSelectedRandomNumbers ( chosenNumbers, _ ) ->
+            let
+                cells =
+                    chosenNumbers
+                        |> List.uniquePairs
+                        |> List.map (\( x, y ) -> { x = x, y = y })
+            in
+            ( { model | cells = cells }, Cmd.none )
 
 
 updateModel model =
@@ -113,8 +136,9 @@ view model =
     toUnstyled <|
         div [ class "container" ]
             [ classes
-            , div [ class "buttons" ]
-                (List.map (viewButton model) Pattern.all)
+            , div [ class "buttons" ] <|
+                List.map (viewButton model) Pattern.all
+                    ++ [ button [ onClick UserClickedGenerateRandomPattern ] [ text "Pseudo-random" ] ]
             , div
                 [ class "container"
                 ]
@@ -133,15 +157,20 @@ viewButton : Model -> Pattern -> Html.Styled.Html Msg
 viewButton model pattern =
     let
         className =
-            if model.pattern == pattern then
-                "selected"
+            case model.selectedPattern of
+                Just selectedPattern ->
+                    if pattern == selectedPattern then
+                        "selected"
 
-            else
-                ""
+                    else
+                        ""
+
+                _ ->
+                    ""
     in
     button
         [ class className
-        , onClick (Select pattern)
+        , onClick (UserSelected pattern)
         ]
         [ text pattern.name ]
 
