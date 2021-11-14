@@ -11,6 +11,7 @@ classes =
         [ class "container"
             [ displayFlex
             , flexDirection row
+            , padding (rem 1)
             ]
         , class "buttons"
             [ displayFlex
